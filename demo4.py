@@ -40,6 +40,9 @@ sets_and_maps = {
                     "id": {
                         "type": "long"
                     },
+                    "name": {
+                        "type": "text"
+                    },
                     "contract_period": {
                         "type": "date"
                     },
@@ -212,25 +215,131 @@ data = {
 # 4.批量处理官方文档：https://elasticsearch-py.readthedocs.io/en/master/helpers.html#example
 
 # 5.ES数据的查询
-
-data = {
+# 主要是对查询体的构造，均使用search()这个函数
+# 5.1 查询数据构造
+data1 = {
     "employee": {
         "id": 123,
+        "name": "zhang fei",
         "contract_period": "2022-06-26",
         "age": 25,
         "salary": 5252525
     },
     "department": {
         "id": 123,
-        "name": "2022-06-26",
+        "name": "cai jing",
+        "capacity": 20,
+    },
+}
+data2 = {
+    "employee": {
+        "id": 124,
+        "name": "liu bei",
+        "contract_period": "2023-07-16",
+        "age": 26,
+        "salary": 3241225
+    },
+    "department": {
+        "id": 123,
+        "name": "cai jing",
+        "capacity": 20,
+    },
+}
+data3 = {
+    "employee": {
+        "id": 125,
+        "name": "guan yu",
+        "contract_period": "2021-01-11",
+        "age": 36,
+        "salary": 3241225
+    },
+    "department": {
+        "id": 124,
+        "name": "cun chu",
         "capacity": 25,
     },
 }
+data4 = {
+    "employee": {
+        "id": 126,
+        "name": "lv bu",
+        "contract_period": "2027-01-11",
+        "age": 34,
+        "salary": 8241225
+    },
+    "department": {
+        "id": 124,
+        "name": "cun chu",
+        "capacity": 25,
+    },
+}
+es.index(index='employees', id=3, body=data3)
 
-# 视频后缀名：.avi；.wmv；.mpg；.mpeg；.mov；.rm；.ram；.swf；.flv；.mp4
-# 图像后缀名：.bmp；.jpg；.jpeg；.png；.gif；.pcd；.psd；mac；dwg；.cpx；.eps；；；；；；；；；；；；；；；；；；；；；
-# 音频后缀名：.aiff；cd；wave；.mpg；.mpeg；.mp3；mpeg4；midi；wma；realaudio；vqf；oggvorbis；amr；ape；flac；aac；；
-# 文本后缀名：.txt；.doc；.docx；.xls；.xlsx；.ppt；.pptx；.wps；.awd；.bak；.bat；.bin；.com；.c；.h；.cpp；.java；.py；.go；；；；；；；；；；；；；；；；；；；；
-# 压缩包后缀名：.rar；.iso；.zip；.7z；.arj；.cab；.gz；.a；.z；.tar；.tgz；.bz2；.cgz；cpio；.rpm；.deb；；；；；；；；；；；；；；；；；；；；；；；；；；；；
-# 其他后缀名：.exe；.html；.msi；.tmp；.mdf；.mid；.dbf；.dll；.lib；.fon；.get；.out；；
-# https://wenku.baidu.com/view/8294b7c59a8fcc22bcd126fff705cc1755275fb4.html
+# 5.2 简单查询
+#  select 字段|表达式,...					⑦
+#  from 表								①
+# 【(join type) join 表2 】				②
+# 【on 连接条件】							③
+# 【where 条件】							④
+# 【group by 分组字段】					⑤
+# 【having 条件】							⑥
+# 【order by 排序的字段】					⑧
+#  limit 起始的条目索引，条目数;			⑨
+# ES有很多关键字，单独介绍太枯燥且浪费时间，通过一些例子去理解吧
+# 5.2.1 query、bool、should、match、_source、sort
+body = {
+    "query": {
+        "bool": {
+            "should": [
+                {
+                    "match": {
+                        "employee.salary": 3241225
+                    }
+                },
+                {
+                    "match": {
+                        "department.name": "cun chu"
+                    }
+                }
+            ],
+        }
+    },
+    "_source": ["employee.id", "department.id", "department.capacity"],
+    "sort": [
+        {
+            "employee.id": {
+                "order": "asc"
+            }
+        },
+        {
+            "department.capacity": {
+                "order": "desc"
+            }
+        }
+    ]
+}
+
+result = es.search(index="employees", body=body)
+print(result)
+# query:用于存放查询语句的，类似于mysql的where
+# bool:用于组合查询条件，实现多条件查询
+# should:相当于or，must相当and，must_not 相当于不等于
+# match:返回所有匹配的分词，为模糊查找
+# _source：用于筛选查询结果字段，类似于mysql的select
+# sort：用于查询结果排序，类似于mysql的order by
+# select "employee.id", "department.id",
+# "department.capacity" from "employees" where "employee.salary"=3241225 or "department.name"= "cun chu";
+# todo 说明查询结果字段，filter_path作用
+
+# 5.2.2 match term
+# match查询属于高层查询，会根据你查询的字段的类型不一致，采用不同的查询方式。
+#
+# 如果查询的是日期或者数值的字段，他会自动将你的字符串查询内容转换成日期或者数值对待；
+# 如果查询的内容是一个不能被分词的字段(keyword).match查询不会对你的指定查询关键字进行分词；
+# 如果查询的内容是一个可以分词的字段(text)，match会将你指定的查询内容根据一定的方式去分词，然后去分词库中匹配指定的内容。
+# 总而言之：match查询，实际底层就是多个term查询，将多个term查询的结果汇集到一起返回给你。
+
+# 5.2.2 query  filter
+
+# 5.2.2agg
+
